@@ -1,0 +1,1 @@
+{"class_names": ["fractured", "not fractured"], "img_size": [224, 224], "note": "sigmoid output = probability of class index 1 ('not fractured')"}

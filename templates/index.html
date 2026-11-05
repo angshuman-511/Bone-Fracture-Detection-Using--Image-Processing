@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bone Fracture Detector</title>
+<style>
+  :root{
+    --bg:#0b1220; --bg2:#111a2e; --card:#141f38; --line:#243255;
+    --text:#e8eefc; --muted:#8fa0c4; --brand:#4f8cff; --brand2:#7c5cff;
+    --ok:#22c55e; --bad:#ef4444;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#eef3fb; --bg2:#ffffff; --card:#ffffff; --line:#d6dff0;
+           --text:#12203d; --muted:#5b6b8c; }
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 600px at 10% -10%, rgba(79,140,255,.18), transparent),
+               radial-gradient(900px 500px at 100% 0%, rgba(124,92,255,.16), transparent), var(--bg);
+    color:var(--text); min-height:100vh; display:flex; justify-content:center; padding:32px 16px;
+  }
+  .wrap{width:100%; max-width:760px}
+  header{text-align:center; margin-bottom:26px}
+  .logo{font-size:40px}
+  h1{font-size:28px; margin:6px 0 4px; letter-spacing:.2px}
+  .sub{color:var(--muted); font-size:15px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:20px; padding:22px;
+        box-shadow:0 20px 50px rgba(0,0,0,.25)}
+  .banner{display:none; background:rgba(239,68,68,.12); border:1px solid var(--bad); color:var(--bad);
+          padding:12px 14px; border-radius:12px; margin-bottom:16px; font-size:14px}
+  .drop{
+    border:2px dashed var(--line); border-radius:16px; padding:46px 20px; text-align:center; cursor:pointer;
+    transition:.2s; background:var(--bg2);
+  }
+  .drop:hover,.drop.over{border-color:var(--brand); background:rgba(79,140,255,.08); transform:translateY(-1px)}
+  .drop .ico{font-size:46px}
+  .drop b{display:block; font-size:18px; margin:10px 0 4px}
+  .drop span{color:var(--muted); font-size:14px}
+  .preview{display:none}
+  .preview .imgbox{position:relative; border-radius:16px; overflow:hidden; background:#000;
+                   display:flex; justify-content:center; max-height:380px}
+  .preview img{max-width:100%; max-height:380px; object-fit:contain; display:block}
+  .scan{position:absolute; left:0; right:0; height:3px; top:0; display:none;
+        background:linear-gradient(90deg,transparent,var(--brand),transparent);
+        box-shadow:0 0 18px var(--brand); animation:scan 1.4s linear infinite}
+  .loading .scan{display:block}
+  @keyframes scan{0%{top:0}100%{top:100%}}
+  .fname{margin:12px 2px 0; color:var(--muted); font-size:13px; word-break:break-all}
+  .btns{display:flex; gap:10px; margin-top:16px}
+  button{
+    flex:1; border:0; padding:14px 18px; border-radius:12px; font-size:16px; font-weight:600; cursor:pointer;
+    transition:.15s; color:#fff; background:linear-gradient(135deg,var(--brand),var(--brand2));
+  }
+  button:hover{filter:brightness(1.08); transform:translateY(-1px)}
+  button:disabled{opacity:.55; cursor:not-allowed; transform:none}
+  button.ghost{background:transparent; color:var(--text); border:1px solid var(--line)}
+  .result{display:none; margin-top:20px; border-radius:16px; padding:20px; border:1px solid var(--line);
+          background:var(--bg2); animation:pop .3s ease}
+  @keyframes pop{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
+  .result.bad{border-color:var(--bad); background:rgba(239,68,68,.08)}
+  .result.ok{border-color:var(--ok); background:rgba(34,197,94,.08)}
+  .verdict{display:flex; align-items:center; gap:12px; font-size:24px; font-weight:700}
+  .result.bad .verdict{color:var(--bad)} .result.ok .verdict{color:var(--ok)}
+  .conf{margin:6px 0 16px; color:var(--muted); font-size:14px}
+  .bar{margin:10px 0}
+  .bar .row{display:flex; justify-content:space-between; font-size:14px; margin-bottom:5px}
+  .track{height:10px; border-radius:8px; background:var(--line); overflow:hidden}
+  .fill{height:100%; width:0; border-radius:8px; transition:width .8s cubic-bezier(.2,.8,.2,1)}
+  .f-bad{background:var(--bad)} .f-ok{background:var(--ok)}
+  .err{display:none; margin-top:16px; color:var(--bad); font-size:14px; text-align:center}
+  footer{margin-top:18px; text-align:center; color:var(--muted); font-size:12.5px; line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">🦴</div>
+    <h1>Bone Fracture Detector</h1>
+    <p class="sub">Drag &amp; drop an X-ray image and the AI will analyze it instantly</p>
+  </header>
+
+  <div class="card">
+    <div class="banner" id="banner"></div>
+
+    <div class="drop" id="drop">
+      <div class="ico">📤</div>
+      <b>Drop your X-ray image here</b>
+      <span>or click to browse &middot; JPG / PNG &middot; max 15 MB</span>
+      <input type="file" id="file" accept="image/*" hidden>
+    </div>
+
+    <div class="preview" id="preview">
+      <div class="imgbox" id="imgbox"><img id="img" alt="preview"><div class="scan"></div></div>
+      <div class="fname" id="fname"></div>
+      <div class="btns">
+        <button id="go">🔍 Analyze Image</button>
+        <button class="ghost" id="reset">New Image</button>
+      </div>
+    </div>
+
+    <div class="err" id="err"></div>
+
+    <div class="result" id="result">
+      <div class="verdict"><span id="vicon"></span><span id="vtext"></span></div>
+      <div class="conf" id="conf"></div>
+      <div id="bars"></div>
+    </div>
+  </div>
+
+  <footer>⚠️ This AI is for learning/demo purposes only. It is not a substitute for a doctor's diagnosis.</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const drop = $("drop"), fileInput = $("file"), preview = $("preview"),
+      img = $("img"), go = $("go"), result = $("result"), err = $("err");
+let current = null;
+
+fetch("/health").then(r => r.json()).then(h => {
+  if (!h.ready) { $("banner").style.display = "block"; $("banner").textContent = "⚠️ " + (h.error || "Model is not ready."); }
+}).catch(()=>{});
+
+drop.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", e => e.target.files[0] && setFile(e.target.files[0]));
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => e.dataTransfer.files[0] && setFile(e.dataTransfer.files[0]));
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => e.preventDefault());
+window.addEventListener("paste", e => {                 // pasting an image with Ctrl+V also works
+  const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith("image/"));
+  if (f) setFile(f);
+});
+
+function setFile(f){
+  err.style.display = "none"; result.style.display = "none";
+  if (!f.type.startsWith("image/")) return showErr("Please choose an image file (JPG/PNG).");
+  if (f.size > 15*1024*1024) return showErr("Image is larger than 15 MB.");
+  current = f;
+  img.src = URL.createObjectURL(f);
+  $("fname").textContent = f.name + " · " + (f.size/1024).toFixed(0) + " KB";
+  drop.style.display = "none"; preview.style.display = "block";
+}
+function showErr(m){ err.textContent = "❌ " + m; err.style.display = "block"; }
+
+$("reset").addEventListener("click", () => {
+  current = null; fileInput.value = ""; preview.style.display = "none";
+  result.style.display = "none"; err.style.display = "none"; drop.style.display = "block";
+});
+
+go.addEventListener("click", async () => {
+  if (!current) return;
+  err.style.display = "none"; result.style.display = "none";
+  go.disabled = true; go.textContent = "⏳ Analyzing..."; $("imgbox").classList.add("loading");
+  const fd = new FormData(); fd.append("image", current);
+  try {
+    const r = await fetch("/predict", { method: "POST", body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Something went wrong.");
+    showResult(d);
+  } catch (e) { showErr(e.message); }
+  finally { go.disabled = false; go.textContent = "🔍 Analyze Image"; $("imgbox").classList.remove("loading"); }
+});
+
+function showResult(d){
+  const bad = d.is_fractured;
+  result.className = "result " + (bad ? "bad" : "ok");
+  $("vicon").textContent = bad ? "🚨" : "✅";
+  $("vtext").textContent = bad ? "Fracture Detected" : "No Fracture Detected";
+  $("conf").textContent = "Confidence: " + d.confidence.toFixed(1) + "%";
+  $("bars").innerHTML = Object.entries(d.probabilities).map(([k, v]) => {
+    const isFrac = k.toLowerCase() === "fractured";
+    return `<div class="bar"><div class="row"><span>${k}</span><span>${v.toFixed(1)}%</span></div>
+            <div class="track"><div class="fill ${isFrac ? "f-bad" : "f-ok"}" data-w="${v}"></div></div></div>`;
+  }).join("");
+  result.style.display = "block";
+  requestAnimationFrame(() => document.querySelectorAll(".fill").forEach(f => f.style.width = f.dataset.w + "%"));
+  result.scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+</script>
+</body>
+</html>
